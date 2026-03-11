@@ -1,4 +1,4 @@
-# ☁️ Kerit-Renew
+# 🎮 Kerit-Renew
 自动续期 Kerit 免费服务器，每 6 天定时运行。
 
 ## 🔐 Secrets 配置
