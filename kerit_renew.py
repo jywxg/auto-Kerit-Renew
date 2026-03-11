@@ -191,9 +191,9 @@ EXPAND_POPUP_JS = """
 # 注入 postMessage 监听器：捕获 CF Turnstile complete 事件
 INJECT_TOKEN_LISTENER_JS = """
 (function() {
+    window.__cf_turnstile_token__ = '';
     if (window.__cf_token_listener_injected__) return;
     window.__cf_token_listener_injected__ = true;
-    window.__cf_turnstile_token__ = '';
 
     window.addEventListener('message', function(e) {
         if (!e.origin || e.origin.indexOf('cloudflare.com') === -1) return;
@@ -550,22 +550,6 @@ def do_renew(sb):
             send_tg(f"❌ Turnstile未出现，第{attempt + 1}次失败", server_id)
             return
 
-        # 清空上一次的 token，避免复用（同时清空 input 字段）
-        try:
-            sb.execute_script("""
-                window.__cf_turnstile_token__ = '';
-                var inputs = document.querySelectorAll('input[name="cf-turnstile-response"], input[name="cf_turnstile_response"]');
-                for (var i = 0; i < inputs.length; i++) {
-                    try {
-                        var nativeSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                        nativeSet.call(inputs[i], '');
-                        inputs[i].dispatchEvent(new Event('input', {bubbles: true}));
-                    } catch(e) { inputs[i].value = ''; }
-                }
-            """)
-        except Exception:
-            pass
-
         if not solve_turnstile(sb):
             sb.save_screenshot(f"turnstile_fail_{attempt}.png")
             send_tg(f"❌ Turnstile验证失败，第{attempt + 1}次", server_id)
@@ -591,22 +575,6 @@ def do_renew(sb):
             }})()
         """)
         print(f"📋 续期结果: {result}")
-
-        # 清空 token 防止下次复用（同时清空 input 字段）
-        try:
-            sb.execute_script("""
-                window.__cf_turnstile_token__ = '';
-                var inputs = document.querySelectorAll('input[name="cf-turnstile-response"], input[name="cf_turnstile_response"]');
-                for (var i = 0; i < inputs.length; i++) {
-                    try {
-                        var nativeSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                        nativeSet.call(inputs[i], '');
-                        inputs[i].dispatchEvent(new Event('input', {bubbles: true}));
-                    } catch(e) { inputs[i].value = ''; }
-                }
-            """)
-        except Exception:
-            pass
 
         try:
             sb.execute_script("document.querySelector('[data-bs-dismiss=\"modal\"]')?.click();")
