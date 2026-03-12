@@ -14,6 +14,22 @@ from urllib.parse import unquote, urlparse, parse_qs
 from seleniumbase import SB
 
 # ============================================================
+# 工具函数
+# ============================================================
+
+def mask_email(email_str: str) -> str:
+    """掩码邮箱：保留第一个字符和@前最后一个字符，其他用*替代"""
+    parts = email_str.split("@")
+    local = parts[0]
+    domain = parts[1]
+    
+    if len(local) > 2:
+        return local[0] + "*" * (len(local) - 2) + local[-1] + "@" + domain
+    else:
+        return local[0] + "*" * max(0, len(local) - 1) + ("" if len(local) == 1 else local[-1]) + "@" + domain
+
+
+# ============================================================
 # 配置（从环境变量读取）
 # ============================================================
 
@@ -25,7 +41,8 @@ GMAIL_PASSWORD = _account[1].strip()
 HY2_PROXY_URL = os.getenv('HY2_PROXY_URL', "")
 SOCKS_PORT = int(os.getenv('SOCKS_PORT', '51080'))
 
-MASKED_EMAIL   = "******@" + KERIT_EMAIL.split("@")[1]
+# 邮箱掩码
+MASKED_EMAIL = mask_email(KERIT_EMAIL)
 
 LOGIN_URL      = "https://billing.kerit.cloud/"
 FREE_PANEL_URL = "https://billing.kerit.cloud/free_panel"
@@ -184,10 +201,11 @@ def send_tg(result, server_id=None, remaining=None, ip_info=None, email=None):
         # 如果 TG_CHAT_ID 为空，则使用 id=0000，否则使用实际的 chat_id
         tg_user_id = TG_CHAT_ID if TG_CHAT_ID else "0000"
         tg_user_link = f'<a href="tg://user?id={tg_user_id}">{email}</a>'
-        lines.append(f"� 邮箱: {tg_user_link}")
+        lines.append(f"📮 邮箱: {tg_user_link}")
+
+    lines.append(f"📊 续期结果: {result}")
     if server_id is not None:
         lines.append(f"🖥 服务器ID: {server_id}")
-    lines.append(f"📊 续期结果: {result}")
     if remaining is not None:
         lines.append(f"⏱️ 剩余天数: {remaining}天")
     if ip_info:
@@ -218,8 +236,16 @@ def fetch_otp_from_gmail(wait_seconds=60) -> str:
     print(f"📬 连接Gmail，等待{wait_seconds}s...")
     deadline = time.time() + wait_seconds
 
-    mail = imaplib.IMAP4_SSL("imap.gmail.com")
-    mail.login(KERIT_EMAIL, GMAIL_PASSWORD)
+    try:
+        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail.login(KERIT_EMAIL, GMAIL_PASSWORD)
+    except imaplib.IMAP4.error as e:
+        print(f"❌ Gmail 认证失败: {e}")
+        print("💡 请检查:")
+        print("   1. KERIT_ACCOUNT 环境变量是否正确")
+        print("   2. Gmail 是否启用了 IMAP 访问")
+        print("   3. 是否需要使用应用专用密码而不是账户密码")
+        raise TimeoutError(f"Gmail 认证失败: {e}")
 
     spam_folder = None
     _, folder_list = mail.list()
